@@ -99,10 +99,11 @@ class BagAttention(BagRE):
 
         # Attention
         if train:
-            if mask is not None:
-                rep = self.sentence_encoder(token, pos1, pos2, mask) # (nsum, H) 
-            else:
-                rep = self.sentence_encoder(token, pos1, pos2) # (nsum, H) 
+            rep = (
+                self.sentence_encoder(token, pos1, pos2, mask)
+                if mask is not None
+                else self.sentence_encoder(token, pos1, pos2)
+            )
 
             if bag_size == 0:
                 bag_rep = []
@@ -132,51 +133,49 @@ class BagAttention(BagRE):
                 softmax_att_score = self.softmax(att_score) # (B, bag)
                 bag_rep = (softmax_att_score.unsqueeze(-1) * rep).sum(1) # (B, bag, 1) * (B, bag, H) -> (B, bag, H) -> (B, H)
             bag_rep = self.drop(bag_rep)
-            bag_logits = self.fc(bag_rep) # (B, N)
+            return self.fc(bag_rep)
+        elif bag_size == 0:
+            rep = []
+            bs = 256
+            total_bs = len(token) // bs + (1 if len(token) % bs != 0 else 0)
+            for b in range(total_bs):
+                with torch.no_grad():
+                    left = bs * b
+                    right = min(bs * (b + 1), len(token))
+                    if mask is not None:        
+                        rep.append(self.sentence_encoder(token[left:right], pos1[left:right], pos2[left:right], mask[left:right]).detach()) # (nsum, H) 
+                    else:
+                        rep.append(self.sentence_encoder(token[left:right], pos1[left:right], pos2[left:right]).detach()) # (nsum, H) 
+            rep = torch.cat(rep, 0)
+
+            bag_logits = []
+            att_mat = self.fc.weight.transpose(0, 1)
+            if self.use_diag:
+                att_mat = att_mat * self.diag.unsqueeze(1)
+            att_score = torch.matmul(rep, att_mat) # (nsum, H) * (H, N) -> (nsum, N)
+            for i in range(len(scope)):
+                bag_mat = rep[scope[i][0]:scope[i][1]] # (n, H)
+                softmax_att_score = self.softmax(att_score[scope[i][0]:scope[i][1]].transpose(0, 1)) # (N, (softmax)n) 
+                rep_for_each_rel = torch.matmul(softmax_att_score, bag_mat) # (N, n) * (n, H) -> (N, H)
+                logit_for_each_rel = self.softmax(self.fc(rep_for_each_rel)) # ((each rel)N, (logit)N)
+                logit_for_each_rel = logit_for_each_rel.diag() # (N)
+                bag_logits.append(logit_for_each_rel)
+            return torch.stack(bag_logits, 0)
         else:
+            rep = (
+                self.sentence_encoder(token, pos1, pos2, mask)
+                if mask is not None
+                else self.sentence_encoder(token, pos1, pos2)
+            )
 
-            if bag_size == 0:
-                rep = []
-                bs = 256
-                total_bs = len(token) // bs + (1 if len(token) % bs != 0 else 0)
-                for b in range(total_bs):
-                    with torch.no_grad():
-                        left = bs * b
-                        right = min(bs * (b + 1), len(token))
-                        if mask is not None:        
-                            rep.append(self.sentence_encoder(token[left:right], pos1[left:right], pos2[left:right], mask[left:right]).detach()) # (nsum, H) 
-                        else:
-                            rep.append(self.sentence_encoder(token[left:right], pos1[left:right], pos2[left:right]).detach()) # (nsum, H) 
-                rep = torch.cat(rep, 0)
-
-                bag_logits = []
-                att_mat = self.fc.weight.transpose(0, 1)
-                if self.use_diag:
-                    att_mat = att_mat * self.diag.unsqueeze(1)
-                att_score = torch.matmul(rep, att_mat) # (nsum, H) * (H, N) -> (nsum, N)
-                for i in range(len(scope)):
-                    bag_mat = rep[scope[i][0]:scope[i][1]] # (n, H)
-                    softmax_att_score = self.softmax(att_score[scope[i][0]:scope[i][1]].transpose(0, 1)) # (N, (softmax)n) 
-                    rep_for_each_rel = torch.matmul(softmax_att_score, bag_mat) # (N, n) * (n, H) -> (N, H)
-                    logit_for_each_rel = self.softmax(self.fc(rep_for_each_rel)) # ((each rel)N, (logit)N)
-                    logit_for_each_rel = logit_for_each_rel.diag() # (N)
-                    bag_logits.append(logit_for_each_rel)
-                bag_logits = torch.stack(bag_logits, 0) # after **softmax**
-            else:
-                if mask is not None:
-                    rep = self.sentence_encoder(token, pos1, pos2, mask) # (nsum, H) 
-                else:
-                    rep = self.sentence_encoder(token, pos1, pos2) # (nsum, H) 
-
-                batch_size = rep.size(0) // bag_size
-                att_mat = self.fc.weight.transpose(0, 1)
-                if self.use_diag:
-                    att_mat = att_mat * self.diag.unsqueeze(1) 
-                att_score = torch.matmul(rep, att_mat) # (nsum, H) * (H, N) -> (nsum, N)
-                att_score = att_score.view(batch_size, bag_size, -1) # (B, bag, N)
-                rep = rep.view(batch_size, bag_size, -1) # (B, bag, H)
-                softmax_att_score = self.softmax(att_score.transpose(1, 2)) # (B, N, (softmax)bag)
-                rep_for_each_rel = torch.matmul(softmax_att_score, rep) # (B, N, bag) * (B, bag, H) -> (B, N, H)
-                bag_logits = self.softmax(self.fc(rep_for_each_rel)).diagonal(dim1=1, dim2=2) # (B, (each rel)N)
-        return bag_logits
+            batch_size = rep.size(0) // bag_size
+            att_mat = self.fc.weight.transpose(0, 1)
+            if self.use_diag:
+                att_mat = att_mat * self.diag.unsqueeze(1)
+            att_score = torch.matmul(rep, att_mat) # (nsum, H) * (H, N) -> (nsum, N)
+            att_score = att_score.view(batch_size, bag_size, -1) # (B, bag, N)
+            rep = rep.view(batch_size, bag_size, -1) # (B, bag, H)
+            softmax_att_score = self.softmax(att_score.transpose(1, 2)) # (B, N, (softmax)bag)
+            rep_for_each_rel = torch.matmul(softmax_att_score, rep) # (B, N, bag) * (B, bag, H) -> (B, N, H)
+            return self.softmax(self.fc(rep_for_each_rel)).diagonal(dim1=1, dim2=2)
 

@@ -19,7 +19,7 @@ class SentenceRE(nn.Module):
                  weight_decay=1e-5, 
                  warmup_step=300,
                  opt='sgd'):
-    
+
         super().__init__()
         self.max_epoch = max_epoch
         # Load data
@@ -38,7 +38,7 @@ class SentenceRE(nn.Module):
                 model.sentence_encoder.tokenize,
                 batch_size,
                 False)
-        
+
         if test_path != None:
             self.test_loader = SentenceRELoader(
                 test_path,
@@ -65,18 +65,23 @@ class SentenceRE(nn.Module):
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             grouped_params = [
                 {
-                    'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 
+                    'params': [
+                        p for n, p in params if all(nd not in n for nd in no_decay)
+                    ],
                     'weight_decay': 0.01,
                     'lr': lr,
-                    'ori_lr': lr
+                    'ori_lr': lr,
                 },
                 {
-                    'params': [p for n, p in params if any(nd in n for nd in no_decay)], 
+                    'params': [
+                        p for n, p in params if any(nd in n for nd in no_decay)
+                    ],
                     'weight_decay': 0.0,
                     'lr': lr,
-                    'ori_lr': lr
-                }
+                    'ori_lr': lr,
+                },
             ]
+
             self.optimizer = AdamW(grouped_params, correct_bias=False)
         else:
             raise Exception("Invalid optimizer. Must be 'sgd' or 'adam' or 'adamw'.")
@@ -102,7 +107,7 @@ class SentenceRE(nn.Module):
             avg_loss = AverageMeter()
             avg_acc = AverageMeter()
             t = tqdm(self.train_loader)
-            for iter, data in enumerate(t):
+            for data in t:
                 if torch.cuda.is_available():
                     for i in range(len(data)):
                         try:
@@ -128,8 +133,11 @@ class SentenceRE(nn.Module):
                 global_step += 1
             # Val 
             logging.info("=== Epoch %d val ===" % epoch)
-            result = self.eval_model(self.val_loader) 
-            logging.info('Metric {} current / best: {} / {}'.format(metric, result[metric], best_metric))
+            result = self.eval_model(self.val_loader)
+            logging.info(
+                f'Metric {metric} current / best: {result[metric]} / {best_metric}'
+            )
+
             if result[metric] > best_metric:
                 logging.info("Best ckpt and saved.")
                 folder_path = '/'.join(self.ckpt.split('/')[:-1])
@@ -145,7 +153,7 @@ class SentenceRE(nn.Module):
         pred_result = []
         with torch.no_grad():
             t = tqdm(eval_loader)
-            for iter, data in enumerate(t):
+            for data in t:
                 if torch.cuda.is_available():
                     for i in range(len(data)):
                         try:
@@ -153,18 +161,16 @@ class SentenceRE(nn.Module):
                         except:
                             pass
                 label = data[0]
-                args = data[1:]        
+                args = data[1:]
                 logits = self.parallel_model(*args)
                 score, pred = logits.max(-1) # (B)
                 # Save result
-                for i in range(pred.size(0)):
-                    pred_result.append(pred[i].item())
+                pred_result.extend(pred[i].item() for i in range(pred.size(0)))
                 # Log
                 acc = float((pred == label).long().sum()) / label.size(0)
                 avg_acc.update(acc, pred.size(0))
                 t.set_postfix(acc=avg_acc.avg)
-        result = eval_loader.dataset.eval(pred_result)
-        return result
+        return eval_loader.dataset.eval(pred_result)
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)

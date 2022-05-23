@@ -20,7 +20,7 @@ class MultiLabelSentenceRE(nn.Module):
                  weight_decay=1e-5, 
                  warmup_step=300,
                  opt='sgd'):
-    
+
         super().__init__()
         self.max_epoch = max_epoch
         # Load data
@@ -39,7 +39,7 @@ class MultiLabelSentenceRE(nn.Module):
                 model.sentence_encoder.tokenize,
                 batch_size,
                 False)
-        
+
         if test_path != None:
             self.test_loader = MultiLabelSentenceRELoader(
                 test_path,
@@ -66,18 +66,23 @@ class MultiLabelSentenceRE(nn.Module):
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             grouped_params = [
                 {
-                    'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 
+                    'params': [
+                        p for n, p in params if all(nd not in n for nd in no_decay)
+                    ],
                     'weight_decay': 0.01,
                     'lr': lr,
-                    'ori_lr': lr
+                    'ori_lr': lr,
                 },
                 {
-                    'params': [p for n, p in params if any(nd in n for nd in no_decay)], 
+                    'params': [
+                        p for n, p in params if any(nd in n for nd in no_decay)
+                    ],
                     'weight_decay': 0.0,
                     'lr': lr,
-                    'ori_lr': lr
-                }
+                    'ori_lr': lr,
+                },
             ]
+
             self.optimizer = AdamW(grouped_params, correct_bias=False)
         else:
             raise Exception("Invalid optimizer. Must be 'sgd' or 'adam' or 'adamw'.")
@@ -103,7 +108,7 @@ class MultiLabelSentenceRE(nn.Module):
             avg_loss = AverageMeter()
             avg_acc = AverageMeter()
             t = tqdm(self.train_loader)
-            for iter, data in enumerate(t):
+            for data in t:
                 if torch.cuda.is_available():
                     for i in range(len(data)):
                         try:
@@ -113,7 +118,7 @@ class MultiLabelSentenceRE(nn.Module):
                 label = data[0]
                 args = data[1:]
                 logits = self.parallel_model(*args)
-                
+
                 label_vec = torch.zeros_like(logits).cuda()
                 label_vec[torch.arange(label_vec.size(0)), label] = 1
                 label_vec = label_vec[:, 1:]
@@ -122,7 +127,7 @@ class MultiLabelSentenceRE(nn.Module):
                 loss = self.criterion(logits.reshape(-1), label_vec.reshape(-1))
                 pred = (torch.sigmoid(logits) >= 0.5).long()
                 acc = float((pred == label_vec).long().sum()) / (label_vec.size(0) * label_vec.size(1))
-                
+
                 # Log
                 avg_loss.update(loss.item(), 1)
                 avg_acc.update(acc, 1)
@@ -136,8 +141,11 @@ class MultiLabelSentenceRE(nn.Module):
                 global_step += 1
             # Val 
             logging.info("=== Epoch %d val ===" % epoch)
-            result = self.eval_model(self.val_loader) 
-            logging.info('Metric {} current / best: {} / {}'.format(metric, result[metric], best_metric))
+            result = self.eval_model(self.val_loader)
+            logging.info(
+                f'Metric {metric} current / best: {result[metric]} / {best_metric}'
+            )
+
             if result[metric] > best_metric:
                 logging.info("Best ckpt and saved.")
                 folder_path = '/'.join(self.ckpt.split('/')[:-1])
@@ -152,7 +160,7 @@ class MultiLabelSentenceRE(nn.Module):
         pred_score = []
         with torch.no_grad():
             t = tqdm(eval_loader)
-            for iter, data in enumerate(t):
+            for data in t:
                 if torch.cuda.is_available():
                     for i in range(len(data)):
                         try:
@@ -160,15 +168,13 @@ class MultiLabelSentenceRE(nn.Module):
                         except:
                             pass
                 label = data[0]
-                args = data[1:]        
+                args = data[1:]
                 logits = self.parallel_model(*args)
                 score = self.parallel_model.module.logit_to_score(logits).cpu().numpy()
                 # Save result
                 pred_score.append(score)
-                # Log
         pred_score = np.concatenate(pred_score, 0)
-        result = eval_loader.dataset.eval(pred_score)
-        return result
+        return eval_loader.dataset.eval(pred_score)
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict)

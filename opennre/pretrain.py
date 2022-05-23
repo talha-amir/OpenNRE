@@ -93,7 +93,7 @@ def download_bert_base_uncased(root_path=default_root_path):
         os.system('wget -P ' + os.path.join(root_path, 'pretrain/bert-base-uncased') + ' ' + root_url + 'opennre/pretrain/bert-base-uncased/vocab.txt')
 
 def download_pretrain(model_name, root_path=default_root_path):
-    ckpt = os.path.join(root_path, 'pretrain/nre/' + model_name + '.pth.tar')
+    ckpt = os.path.join(root_path, f'pretrain/nre/{model_name}.pth.tar')
     if not os.path.exists(ckpt):
         os.system('wget -P ' + os.path.join(root_path, 'pretrain/nre')  + ' ' + root_url + 'opennre/pretrain/nre/' + model_name + '.pth.tar')
 
@@ -125,7 +125,7 @@ def download(name, root_path=default_root_path):
 
 def get_model(model_name, root_path=default_root_path):
     check_root()
-    ckpt = os.path.join(root_path, 'pretrain/nre/' + model_name + '.pth.tar')
+    ckpt = os.path.join(root_path, f'pretrain/nre/{model_name}.pth.tar')
     if model_name == 'wiki80_cnn_softmax':
         download_pretrain(model_name, root_path=root_path)
         download('glove', root_path=root_path)

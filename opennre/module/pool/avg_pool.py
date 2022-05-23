@@ -29,10 +29,9 @@ class AvgPool(nn.Module):
             output features: (B, H_EMBED)
         """
         # Check size of tensors
-        if mask == None or self.segment_num == None or self.segment_num == 1:
+        if mask is None or self.segment_num is None or self.segment_num == 1:
             x = x.transpose(1, 2) # (B, L, I_EMBED) -> (B, I_EMBED, L)
             x = self.pool(x).squeeze(-1) # (B, I_EMBED, 1) -> (B, I_EMBED)
-            return x
         else:
             B, L, I_EMBED = x.size()[:2]
             mask = self.mask_embedding(mask).transpose(1, 2).unsqueeze(2) # (B, L) -> (B, L, S) -> (B, S, L) -> (B, S, 1, L)
@@ -40,4 +39,4 @@ class AvgPool(nn.Module):
             x = (x * mask).view([-1, I_EMBED, L]) # (B, S, I_EMBED, L) -> (B * S, I_EMBED, L)
             x = self.pool(x).squeeze(-1) # (B * S, I_EMBED, 1) -> (B * S, I_EMBED)
             x = x.view([B, -1]) - self._minus # (B, S * I_EMBED)
-            return x
+        return x

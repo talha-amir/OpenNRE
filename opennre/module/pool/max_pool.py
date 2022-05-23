@@ -33,7 +33,6 @@ class MaxPool(nn.Module):
         if mask is None or self.segment_num is None or self.segment_num == 1:
             x = x.transpose(1, 2) # (B, L, I_EMBED) -> (B, I_EMBED, L)
             x = self.pool(x).squeeze(-1) # (B, I_EMBED, 1) -> (B, I_EMBED)
-            return x
         else:
             B, L, I_EMBED = x.size()[:3]
             # mask = 1 - self.mask_embedding(mask).transpose(1, 2).unsqueeze(2) # (B, L) -> (B, L, S) -> (B, S, L) -> (B, S, 1, L)
@@ -49,5 +48,5 @@ class MaxPool(nn.Module):
             pool3 = self.pool(x + self._minus * mask[:, 2:3, :])
 
             x = torch.cat([pool1, pool2, pool3], 1)
-            # x = x.squeeze(-1)
-            return  x
+
+        return x

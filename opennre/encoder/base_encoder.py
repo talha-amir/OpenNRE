@@ -35,20 +35,16 @@ class BaseEncoder(nn.Module):
         self.num_position = max_length * 2
         self.mask_entity = mask_entity
 
-        if word2vec is None:
-            self.word_size = word_size
-        else:
-            self.word_size = word2vec.shape[-1]
-            
+        self.word_size = word_size if word2vec is None else word2vec.shape[-1]
         self.position_size = position_size
         self.hidden_size = hidden_size
         self.input_size = word_size + position_size * 2
         self.blank_padding = blank_padding
 
-        if not '[UNK]' in self.token2id:
+        if '[UNK]' not in self.token2id:
             self.token2id['[UNK]'] = len(self.token2id)
             self.num_token += 1
-        if not '[PAD]' in self.token2id:
+        if '[PAD]' not in self.token2id:
             self.token2id['[PAD]'] = len(self.token2id)
             self.num_token += 1
 

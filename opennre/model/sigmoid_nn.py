@@ -33,8 +33,7 @@ class SigmoidNN(SentenceRE):
         """
         rep = self.sentence_encoder(*args) # (B, H)
         rep = self.drop(rep)
-        logits = self.fc(rep) # (B, N)
-        return logits
+        return self.fc(rep)
 
     def logit_to_score(self, logits):
         return torch.sigmoid(logits)

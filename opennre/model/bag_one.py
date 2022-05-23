@@ -110,13 +110,13 @@ class BagOne(BagRE):
         # Max
         if train:
             if bag_size == 0:
-                bag_rep = []
                 query = torch.zeros((rep.size(0))).long()
                 if torch.cuda.is_available():
                     query = query.cuda()
                 for i in range(len(scope)):
                     query[scope[i][0]:scope[i][1]] = label[i]
 
+                bag_rep = []
                 for i in range(len(scope)): # iterate over bags
                     bag_mat = rep[scope[i][0]:scope[i][1]] # (n, H)
                     instance_logit = self.softmax(self.fc(bag_mat)) # (n, N)
@@ -124,8 +124,6 @@ class BagOne(BagRE):
                     max_index = instance_logit[:, query[i]].argmax()  # (1)
                     bag_rep.append(bag_mat[max_index]) # (n, H) -> (H)
                 bag_rep = torch.stack(bag_rep, 0) # (B, H)
-                bag_rep = self.drop(bag_rep)
-                bag_logits = self.fc(bag_rep) # (B, N)
             else:
                 batch_size = label.size(0)
                 query = label # (B)
@@ -134,22 +132,18 @@ class BagOne(BagRE):
                 max_index = instance_logit[torch.arange(batch_size), :, query].argmax(-1)
                 bag_rep = rep[torch.arange(batch_size), max_index]
 
-                bag_rep = self.drop(bag_rep)
-                bag_logits = self.fc(bag_rep) # (B, N)
-
+            bag_rep = self.drop(bag_rep)
+            return self.fc(bag_rep)
+        elif bag_size == 0:
+            bag_logits = []
+            for i in range(len(scope)):
+                bag_mat = rep[scope[i][0]:scope[i][1]] # (n, H)
+                instance_logit = self.softmax(self.fc(bag_mat)) # (n, N)
+                logit_for_each_rel = instance_logit.max(dim=0)[0] # (N)
+                bag_logits.append(logit_for_each_rel)
+            return torch.stack(bag_logits, 0)
         else:
-            if bag_size == 0:
-                bag_logits = []
-                for i in range(len(scope)):
-                    bag_mat = rep[scope[i][0]:scope[i][1]] # (n, H)
-                    instance_logit = self.softmax(self.fc(bag_mat)) # (n, N)
-                    logit_for_each_rel = instance_logit.max(dim=0)[0] # (N)
-                    bag_logits.append(logit_for_each_rel)
-                bag_logits = torch.stack(bag_logits, 0) # after **softmax**
-            else:
-                batch_size = rep.size(0) // bag_size
-                rep = rep.view(batch_size, bag_size, -1)
-                bag_logits = self.softmax(self.fc(rep)).max(1)[0]
-
-        return bag_logits
+            batch_size = rep.size(0) // bag_size
+            rep = rep.view(batch_size, bag_size, -1)
+            return self.softmax(self.fc(rep)).max(1)[0]
 

@@ -73,25 +73,44 @@ sys.path.append(root_path)
 if not os.path.exists('ckpt'):
     os.mkdir('ckpt')
 if len(args.ckpt) == 0:
-    args.ckpt = '{}_{}'.format(args.dataset, 'pcnn_att')
-ckpt = 'ckpt/{}.pth.tar'.format(args.ckpt)
+    args.ckpt = f'{args.dataset}_pcnn_att'
+ckpt = f'ckpt/{args.ckpt}.pth.tar'
 
 if args.dataset != 'none':
     opennre.download(args.dataset, root_path=root_path)
-    args.train_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_train.txt'.format(args.dataset))
-    args.val_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_val.txt'.format(args.dataset))
+    args.train_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_train.txt'
+    )
+
+    args.val_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_val.txt'
+    )
+
     if not os.path.exists(args.val_file):
         logging.info("Cannot find the validation file. Use the test file instead.")
-        args.val_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_test.txt'.format(args.dataset))
-    args.test_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_test.txt'.format(args.dataset))
-    args.rel2id_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_rel2id.json'.format(args.dataset))
-else:
-    if not (os.path.exists(args.train_file) and os.path.exists(args.val_file) and os.path.exists(args.test_file) and os.path.exists(args.rel2id_file)):
-        raise Exception('--train_file, --val_file, --test_file and --rel2id_file are not specified or files do not exist. Or specify --dataset')
+        args.val_file = os.path.join(
+            root_path, 'benchmark', args.dataset, f'{args.dataset}_test.txt'
+        )
+
+    args.test_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_test.txt'
+    )
+
+    args.rel2id_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_rel2id.json'
+    )
+
+elif (
+    not os.path.exists(args.train_file)
+    or not os.path.exists(args.val_file)
+    or not os.path.exists(args.test_file)
+    or not os.path.exists(args.rel2id_file)
+):
+    raise Exception('--train_file, --val_file, --test_file and --rel2id_file are not specified or files do not exist. Or specify --dataset')
 
 logging.info('Arguments:')
 for arg in vars(args):
-    logging.info('    {}: {}'.format(arg, getattr(args, arg)))
+    logging.info(f'    {arg}: {getattr(args, arg)}')
 
 rel2id = json.load(open(args.rel2id_file))
 
@@ -175,6 +194,10 @@ logging.info('P@200: %.5f' % (result['p@200']))
 logging.info('P@300: %.5f' % (result['p@300']))
 
 # Save precision/recall points
-np.save('result/{}_p.npy'.format(args.result), result['np_prec'])
-np.save('result/{}_r.npy'.format(args.result), result['np_rec'])
-json.dump(result['max_micro_f1_each_relation'], open('result/{}_mmicrof1_rel.json'.format(args.result), 'w'), ensure_ascii=False)
+np.save(f'result/{args.result}_p.npy', result['np_prec'])
+np.save(f'result/{args.result}_r.npy', result['np_rec'])
+json.dump(
+    result['max_micro_f1_each_relation'],
+    open(f'result/{args.result}_mmicrof1_rel.json', 'w'),
+    ensure_ascii=False,
+)

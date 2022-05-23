@@ -37,8 +37,6 @@ class BagAverage(BagRE):
         Return:
             (relation, score)
         """
-        pass
-
         """
         tokens = []
         pos1s = []
@@ -117,8 +115,7 @@ class BagAverage(BagRE):
         # Average
         bag_rep = []
         if bag_size is None or bag_size == 0:
-            for i in range(len(scope)):
-                bag_rep.append(rep[scope[i][0]:scope[i][1]].mean(0))
+            bag_rep.extend(rep[scope[i][0]:scope[i][1]].mean(0) for i in range(len(scope)))
             bag_rep = torch.stack(bag_rep, 0) # (B, H)
         else:
             batch_size = len(scope)

@@ -21,7 +21,7 @@ class BagRE(nn.Module):
                  opt='sgd',
                  bag_size=0,
                  loss_weight=False):
-    
+
         super().__init__()
         self.max_epoch = max_epoch
         self.bag_size = bag_size
@@ -45,7 +45,7 @@ class BagRE(nn.Module):
                 False,
                 bag_size=bag_size,
                 entpair_as_bag=True)
-        
+
         if test_path != None:
             self.test_loader = BagRELoader(
                 test_path,
@@ -76,18 +76,23 @@ class BagRE(nn.Module):
             no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
             grouped_params = [
                 {
-                    'params': [p for n, p in params if not any(nd in n for nd in no_decay)], 
+                    'params': [
+                        p for n, p in params if all(nd not in n for nd in no_decay)
+                    ],
                     'weight_decay': 0.01,
                     'lr': lr,
-                    'ori_lr': lr
+                    'ori_lr': lr,
                 },
                 {
-                    'params': [p for n, p in params if any(nd in n for nd in no_decay)], 
+                    'params': [
+                        p for n, p in params if any(nd in n for nd in no_decay)
+                    ],
                     'weight_decay': 0.0,
                     'lr': lr,
-                    'ori_lr': lr
-                }
+                    'ori_lr': lr,
+                },
             ]
+
             self.optimizer = AdamW(grouped_params, correct_bias=False)
         else:
             raise Exception("Invalid optimizer. Must be 'sgd' or 'adam' or 'bert_adam'.")
@@ -107,7 +112,7 @@ class BagRE(nn.Module):
             avg_acc = AverageMeter()
             avg_pos_acc = AverageMeter()
             t = tqdm(self.train_loader)
-            for iter, data in enumerate(t):
+            for data in t:
                 if torch.cuda.is_available():
                     for i in range(len(data)):
                         try:
@@ -124,17 +129,13 @@ class BagRE(nn.Module):
                 acc = float((pred == label).long().sum()) / label.size(0)
                 pos_total = (label != 0).long().sum()
                 pos_correct = ((pred == label).long() * (label != 0).long()).sum()
-                if pos_total > 0:
-                    pos_acc = float(pos_correct) / float(pos_total)
-                else:
-                    pos_acc = 0
-
+                pos_acc = float(pos_correct) / float(pos_total) if pos_total > 0 else 0
                 # Log
                 avg_loss.update(loss.item(), 1)
                 avg_acc.update(acc, 1)
                 avg_pos_acc.update(pos_acc, 1)
                 t.set_postfix(loss=avg_loss.avg, acc=avg_acc.avg, pos_acc=avg_pos_acc.avg)
-                
+
                 # Optimize
                 loss.backward()
                 self.optimizer.step()
@@ -156,7 +157,7 @@ class BagRE(nn.Module):
         with torch.no_grad():
             t = tqdm(eval_loader)
             pred_result = []
-            for iter, data in enumerate(t):
+            for data in t:
                 if torch.cuda.is_available():
                     for i in range(len(data)):
                         try:
@@ -170,13 +171,16 @@ class BagRE(nn.Module):
                 logits = self.model(None, scope, *args, train=False, bag_size=self.bag_size) # results after softmax
                 logits = logits.cpu().numpy()
                 for i in range(len(logits)):
-                    for relid in range(self.model.module.num_class):
-                        if self.model.module.id2rel[relid] != 'NA':
-                            pred_result.append({
-                                'entpair': bag_name[i][:2], 
-                                'relation': self.model.module.id2rel[relid], 
-                                'score': logits[i][relid]
-                            })
+                    pred_result.extend(
+                        {
+                            'entpair': bag_name[i][:2],
+                            'relation': self.model.module.id2rel[relid],
+                            'score': logits[i][relid],
+                        }
+                        for relid in range(self.model.module.num_class)
+                        if self.model.module.id2rel[relid] != 'NA'
+                    )
+
             result = eval_loader.dataset.eval(pred_result)
         return result
 

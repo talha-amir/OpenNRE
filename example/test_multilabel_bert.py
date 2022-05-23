@@ -68,29 +68,45 @@ sys.path.append(root_path)
 if not os.path.exists('ckpt'):
     os.mkdir('ckpt')
 if len(args.ckpt) == 0:
-    args.ckpt = '{}_{}_{}'.format(args.dataset, args.pretrain_path, args.pooler)
-ckpt = 'ckpt/{}.pth.tar'.format(args.ckpt)
+    args.ckpt = f'{args.dataset}_{args.pretrain_path}_{args.pooler}'
+ckpt = f'ckpt/{args.ckpt}.pth.tar'
 
 if args.dataset != 'none':
     opennre.download(args.dataset, root_path=root_path)
-    args.train_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_train.txt'.format(args.dataset))
-    args.val_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_val.txt'.format(args.dataset))
-    args.test_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_test.txt'.format(args.dataset))
+    args.train_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_train.txt'
+    )
+
+    args.val_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_val.txt'
+    )
+
+    args.test_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_test.txt'
+    )
+
     if not os.path.exists(args.test_file):
-        logging.warn("Test file {} does not exist! Use val file instead".format(args.test_file))
+        logging.warn(
+            f"Test file {args.test_file} does not exist! Use val file instead"
+        )
+
         args.test_file = args.val_file
-    args.rel2id_file = os.path.join(root_path, 'benchmark', args.dataset, '{}_rel2id.json'.format(args.dataset))
-    if args.dataset == 'wiki80':
-        args.metric = 'acc'
-    else:
-        args.metric = 'micro_f1'
-else:
-    if not (os.path.exists(args.train_file) and os.path.exists(args.val_file) and os.path.exists(args.test_file) and os.path.exists(args.rel2id_file)):
-        raise Exception('--train_file, --val_file, --test_file and --rel2id_file are not specified or files do not exist. Or specify --dataset')
+    args.rel2id_file = os.path.join(
+        root_path, 'benchmark', args.dataset, f'{args.dataset}_rel2id.json'
+    )
+
+    args.metric = 'acc' if args.dataset == 'wiki80' else 'micro_f1'
+elif (
+    not os.path.exists(args.train_file)
+    or not os.path.exists(args.val_file)
+    or not os.path.exists(args.test_file)
+    or not os.path.exists(args.rel2id_file)
+):
+    raise Exception('--train_file, --val_file, --test_file and --rel2id_file are not specified or files do not exist. Or specify --dataset')
 
 logging.info('Arguments:')
 for arg in vars(args):
-    logging.info('    {}: {}'.format(arg, getattr(args, arg)))
+    logging.info(f'    {arg}: {getattr(args, arg)}')
 
 rel2id = json.load(open(args.rel2id_file))
 
@@ -136,10 +152,10 @@ result = framework.eval_model(framework.test_loader)
 
 # Print the result
 logging.info('Test set results:')
-logging.info('Accuracy: {}'.format(result['acc']))
-logging.info('Micro precision: {}'.format(result['micro_p']))
-logging.info('Micro recall: {}'.format(result['micro_r']))
-logging.info('Micro F1: {}'.format(result['micro_f1']))
-logging.info('Macro precision: {}'.format(result['macro_p']))
-logging.info('Macro recall: {}'.format(result['macro_r']))
-logging.info('Macro F1: {}'.format(result['macro_f1']))
+logging.info(f"Accuracy: {result['acc']}")
+logging.info(f"Micro precision: {result['micro_p']}")
+logging.info(f"Micro recall: {result['micro_r']}")
+logging.info(f"Micro F1: {result['micro_f1']}")
+logging.info(f"Macro precision: {result['macro_p']}")
+logging.info(f"Macro recall: {result['macro_r']}")
+logging.info(f"Macro F1: {result['macro_f1']}")

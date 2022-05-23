@@ -11,7 +11,7 @@ def is_whitespace(char):
         \t, \n, and \r are technically contorl characters but we treat them
         as whitespace since they are generally considered as such.
     """
-    if char == " " or char == "\t" or char == "\n" or char == "\r":
+    if char in [" ", "\t", "\n", "\r"]:
         return True
     cat = unicodedata.category(char)
     if cat == "Zs":
@@ -22,7 +22,7 @@ def is_control(char):
     """    Checks whether `chars` is a control character.
         These are technically control characters but we count them as whitespace characters.
     """
-    if char == "\t" or char == "\n" or char == "\r":
+    if char in ["\t", "\n", "\r"]:
         return False
     cat = unicodedata.category(char)
     if cat.startswith("C"):
@@ -52,16 +52,16 @@ def is_chinese_char(cp):
         space-separated words, so they are not treated specially and handled
         like the all of the other languages.
     """
-    if ((cp >= 0x4E00 and cp <= 0x9FFF) or
-        (cp >= 0x3400 and cp <= 0x4DBF) or
-        (cp >= 0x20000 and cp <= 0x2A6DF) or
-        (cp >= 0x2A700 and cp <= 0x2B73F) or
-        (cp >= 0x2B740 and cp <= 0x2B81F) or
-        (cp >= 0x2B820 and cp <= 0x2CEAF) or
-        (cp >= 0xF900 and cp <= 0xFAFF) or
-        (cp >= 0x2F800 and cp <= 0x2FA1F)):
-        return True
-    return False
+    return (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)
+        or (cp >= 0x20000 and cp <= 0x2A6DF)
+        or (cp >= 0x2A700 and cp <= 0x2B73F)
+        or (cp >= 0x2B740 and cp <= 0x2B81F)
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)
+    )
 
 def convert_to_unicode(text):
     """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
@@ -71,14 +71,14 @@ def convert_to_unicode(text):
         elif isinstance(text, bytes):
             return text.decode("utf-8", "ignore")
         else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
+            raise ValueError(f"Unsupported string type: {type(text)}")
     elif six.PY2:
         if isinstance(text, str):
             return text.decode("utf-8", "ignore")
         elif isinstance(text, unicode):
             return text
         else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
+            raise ValueError(f"Unsupported string type: {type(text)}")
     else:
         raise ValueError("Not running on Python2 or Python 3?")
 
@@ -124,9 +124,7 @@ def tokenize_chinese_chars(text):
     for char in text:
         cp = ord(char)
         if is_chinese_char(cp):
-            output.append(" ")
-            output.append(char)
-            output.append(" ")
+            output.extend((" ", char, " "))
         else:
             output.append(char)
     return "".join(output)
@@ -144,22 +142,21 @@ def strip_accents(text):
 
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
-    if vocab_file ==  None:
+    if vocab_file is None:
         raise Exception("Vocab file not provided")
-    if isinstance(vocab_file, str) or isinstance(vocab_file, bytes):
-        vocab = collections.OrderedDict()
-        index = 0
-        with open(vocab_file, "r", encoding="utf-8") as reader:
-            while True:
-                token = reader.readline()
-                if not token:
-                    break
-                token = token.strip()
-                vocab[token] = index
-                index += 1
-        return vocab
-    else:
+    if not isinstance(vocab_file, (str, bytes)):
         return vocab_file
+    vocab = collections.OrderedDict()
+    index = 0
+    with open(vocab_file, "r", encoding="utf-8") as reader:
+        while True:
+            token = reader.readline()
+            if not token:
+                break
+            token = token.strip()
+            vocab[token] = index
+            index += 1
+    return vocab
 
 def printable_text(text):
     """    Returns text encoded in a way suitable for print or `tf.logging`.
@@ -172,14 +169,14 @@ def printable_text(text):
         elif isinstance(text, bytes):
             return text.decode("utf-8", "ignore")
         else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
+            raise ValueError(f"Unsupported string type: {type(text)}")
     elif six.PY2:
         if isinstance(text, str):
             return text
         elif isinstance(text, unicode):
             return text.encode("utf-8")
         else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
+            raise ValueError(f"Unsupported string type: {type(text)}")
     else:
         raise ValueError("Not running on Python2 or Python 3?")
 
@@ -223,26 +220,20 @@ def truncate_seq_pair(tokens_a, tokens_b, max_num_tokens, rng):
             trunc_tokens.pop()
 
 def create_int_feature(values):
-    feature = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
-    return feature
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
 
 def create_float_feature(values):
-    feature = tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
-    return feature
+    return tf.train.Feature(float_list=tf.train.FloatList(value=list(values)))
 
 def add_token(tokens_a, tokens_b = None):
     assert len(tokens_a) >= 1
-    
-    tokens = []
-    segment_ids = []
-    
-    tokens.append("[CLS]")
-    segment_ids.append(0)
-    
+
+    tokens = ["[CLS]"]
+    segment_ids = [0]
     for token in tokens_a:
         tokens.append(token)
         segment_ids.append(0)
-    
+
     tokens.append("[SEP]")
     segment_ids.append(0)
 

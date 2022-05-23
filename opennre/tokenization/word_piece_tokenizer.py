@@ -66,10 +66,7 @@ class WordpieceTokenizer(object):
             sub_tokens = []
             while start < len(chars):
                 end = len(chars)
-                if start > 0:
-                    substr = "##" + chars[start:end]
-                else:
-                    substr = chars[start:end]
+                substr = f"##{chars[start:end]}" if start > 0 else chars[start:end]
                 cur_substr = None
                 while start < end:
                     if substr in self.vocab:
@@ -84,15 +81,12 @@ class WordpieceTokenizer(object):
                     sub_tokens.append(cur_substr)
                     start = end
             current_positions.append([])
+            current_positions[-1].append(len(output_tokens))
             if is_bad:
-                current_positions[-1].append(len(output_tokens))
                 output_tokens.append(self.unk_token)
-                current_positions[-1].append(len(output_tokens))
             else:
-                current_positions[-1].append(len(output_tokens))
                 output_tokens.extend(sub_tokens)
-                current_positions[-1].append(len(output_tokens))
-        
+            current_positions[-1].append(len(output_tokens))
         return output_tokens, current_positions
 
     def convert_tokens_to_ids(self, tokens):

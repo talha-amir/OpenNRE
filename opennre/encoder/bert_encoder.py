@@ -57,7 +57,7 @@ class BERTEncoder(nn.Module):
             rev = True
         else:
             rev = False
-        
+
         if not is_token:
             sent0 = self.tokenizer.tokenize(sentence[:pos_min[0]])
             ent0 = self.tokenizer.tokenize(sentence[pos_min[0]:pos_min[1]])
@@ -72,16 +72,26 @@ class BERTEncoder(nn.Module):
             sent2 = self.tokenizer.tokenize(' '.join(sentence[pos_max[1]:]))
 
         if self.mask_entity:
-            ent0 = ['[unused4]'] if not rev else ['[unused5]']
-            ent1 = ['[unused5]'] if not rev else ['[unused4]']
+            ent0 = ['[unused5]'] if rev else ['[unused4]']
+            ent1 = ['[unused4]'] if rev else ['[unused5]']
         else:
-            ent0 = ['[unused0]'] + ent0 + ['[unused1]'] if not rev else ['[unused2]'] + ent0 + ['[unused3]']
-            ent1 = ['[unused2]'] + ent1 + ['[unused3]'] if not rev else ['[unused0]'] + ent1 + ['[unused1]']
+            ent0 = (
+                ['[unused2]'] + ent0 + ['[unused3]']
+                if rev
+                else ['[unused0]'] + ent0 + ['[unused1]']
+            )
+
+            ent1 = (
+                ['[unused0]'] + ent1 + ['[unused1]']
+                if rev
+                else ['[unused2]'] + ent1 + ['[unused3]']
+            )
+
 
         re_tokens = ['[CLS]'] + sent0 + ent0 + sent1 + ent1 + sent2 + ['[SEP]']
-        
-        pos1 = 1 + len(sent0) if not rev else 1 + len(sent0 + ent0 + sent1)
-        pos2 = 1 + len(sent0 + ent0 + sent1) if not rev else 1 + len(sent0)
+
+        pos1 = 1 + len(sent0 + ent0 + sent1) if rev else 1 + len(sent0)
+        pos2 = 1 + len(sent0) if rev else 1 + len(sent0 + ent0 + sent1)
         pos1 = min(self.max_length - 1, pos1)
         pos2 = min(self.max_length - 1, pos2)
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(re_tokens)
@@ -167,7 +177,7 @@ class BERTEntityEncoder(nn.Module):
             rev = True
         else:
             rev = False
-        
+
         if not is_token:
             sent0 = self.tokenizer.tokenize(sentence[:pos_min[0]])
             ent0 = self.tokenizer.tokenize(sentence[pos_min[0]:pos_min[1]])
@@ -182,18 +192,28 @@ class BERTEntityEncoder(nn.Module):
             sent2 = self.tokenizer.tokenize(' '.join(sentence[pos_max[1]:]))
 
         if self.mask_entity:
-            ent0 = ['[unused4]'] if not rev else ['[unused5]']
-            ent1 = ['[unused5]'] if not rev else ['[unused4]']
+            ent0 = ['[unused5]'] if rev else ['[unused4]']
+            ent1 = ['[unused4]'] if rev else ['[unused5]']
         else:
-            ent0 = ['[unused0]'] + ent0 + ['[unused1]'] if not rev else ['[unused2]'] + ent0 + ['[unused3]']
-            ent1 = ['[unused2]'] + ent1 + ['[unused3]'] if not rev else ['[unused0]'] + ent1 + ['[unused1]']
+            ent0 = (
+                ['[unused2]'] + ent0 + ['[unused3]']
+                if rev
+                else ['[unused0]'] + ent0 + ['[unused1]']
+            )
+
+            ent1 = (
+                ['[unused0]'] + ent1 + ['[unused1]']
+                if rev
+                else ['[unused2]'] + ent1 + ['[unused3]']
+            )
+
 
         re_tokens = ['[CLS]'] + sent0 + ent0 + sent1 + ent1 + sent2 + ['[SEP]']
-        pos1 = 1 + len(sent0) if not rev else 1 + len(sent0 + ent0 + sent1)
-        pos2 = 1 + len(sent0 + ent0 + sent1) if not rev else 1 + len(sent0)
+        pos1 = 1 + len(sent0 + ent0 + sent1) if rev else 1 + len(sent0)
+        pos2 = 1 + len(sent0) if rev else 1 + len(sent0 + ent0 + sent1)
         pos1 = min(self.max_length - 1, pos1)
         pos2 = min(self.max_length - 1, pos2)
-        
+
         indexed_tokens = self.tokenizer.convert_tokens_to_ids(re_tokens)
         avai_len = len(indexed_tokens)
 
